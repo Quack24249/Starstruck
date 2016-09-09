@@ -73,6 +73,7 @@ void turnRuntime() {
 	int power = turnData.a*pow(gyro, 2) +  turnData.b*gyro + turnData.c;
 
 	setDrivePower(autoDrive, turnData.direction*power, -turnData.direction*power);
+	updatePosition(autoDrive);
 }
 
 void turnEnd() {
@@ -182,7 +183,7 @@ void driveStraightRuntime() {
 
 	driveData.totalDist += (leftDist + rightDist) / 2;
 	if (encoderVal(autoDrive) > driveData.minSpeed) driveData.timer = resetTimer(); //track timeout state
-	resetEncoders/*updatePosition*/(autoDrive);
+	updatePosition(autoDrive);
 }
 
 void driveStraightEnd() {
@@ -249,7 +250,7 @@ void _driveStraight_(float distance, float a, float b, float c, bool runAsTask=f
 	}
 
 	//initialize sensors
-	resetEncoders/*updatePosition*/(autoDrive);
+	updatePosition(autoDrive);
 	resetGyro(autoDrive);
 
 	driveData.timer = resetTimer();
@@ -284,3 +285,15 @@ void setDriveDefaults(bool runAsTask, int initialPower=defDriveInts[0], int maxP
 	defDriveFloats = defFloats;
 }
 //end driveStraight region
+
+void goToLocation(float x, float y, float angle=-7) { //TODO: make robot turn in closest direction (e.g. not turning all the way around when it could turn backward)
+	float yDist = y - autoDrive.position.y;
+	float xDist = x - autoDrive.position.x;
+	turn(atan2(y, x)-autoDrive.position.theta, RADIANS);
+
+	driveStraight(sqrt(xDist*xDist + yDist*yDist));
+
+	if (angle > -2*PI) {
+		turn(angle - autoDrive.position.theta)
+	}
+}
