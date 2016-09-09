@@ -23,11 +23,18 @@
 	Note: the functions _turn_() and _driveStraight_() are much less user friendly, but can be used in place of turn() and driveStraight() to more finely configure robot behavior
 */
 
+#define autoDrive drive
+
+#include "coreIncludes.c"
+#include "parallelDrive.c"
+#include "PID.c"
+#include "timer.c"
+
 //turn defaults
 #define TURN_BRAKE_DURATION 100 //maximum duration of braking at end of turn
 angleType defAngleType = DEGREES;
 bool defTurnRunAsTask = false;
-int defTurnInts[5] = { 40, 100, 0, 100, 20 }; //initialPower, maxPower, finalPower, waitAtEnd, brakePower
+int defTurnInts[5] = { 40, 100, -60, 100, 20 }; //initialPower, maxPower, finalPower, waitAtEnd, brakePower
 //end turn defaults
 
 typedef enum correctionType { NONE, GYRO, ENCODER, AUTO };
@@ -35,16 +42,11 @@ typedef enum correctionType { NONE, GYRO, ENCODER, AUTO };
 //drive defaults
 #define DRIVE_BRAKE_POWER 30 //power used during driveStraight braking
 #define DRIVE_BRAKE_DURATION 100 //maximum duration of braking at end of driveStraight
-correctionType defCorrectionType = AUTO; 
+correctionType defCorrectionType = AUTO;
 bool defDriveBools[2] = { false, false }; //runAsTask, rawValue
 int defDriveInts[6] = { 40, 120, 0, 1000, 100, 50 }; //initialPower, maxPower, finalPower, timeout, waitAtEnd, sampleTime
-float defDriveFloats[4] = { 0.25, 0.25, 0.25, 3 } //kP, kI, kD, minSpeed
+float defDriveFloats[4] = { 0.25, 0.25, 0.25, 0.5 }; //kP, kI, kD, minSpeed
 //end drive defaults
-
-#include "coreIncludes.c"
-#include "parallelDrive.c"
-#include "PID.c"
-#include "timer.c"
 
 
 parallel_drive autoDrive;
@@ -92,10 +94,9 @@ task turnTask() {
 	turnEnd();
 }
 
-void _turn_(parallel_drive &drive, float angle, float a, float b, float c, bool runAsTask=false, int waitAtEnd=100, int brakePower=20) { //Internal function. Use at your own risk.
+void _turn_(float angle, float a, float b, float c, bool runAsTask=false, int waitAtEnd=100, int brakePower=20) { //Internal function. Use at your own risk.
 	if (drive.hasGyro) {
 		//initialize variables
-		autoDrive = drive;
 		turnData.angle = abs(angle);
 		turnData.a = a;
 		turnData.b = b;
@@ -116,12 +117,12 @@ void _turn_(parallel_drive &drive, float angle, float a, float b, float c, bool 
 	}
 }
 
-void turn(parallel_drive &drive, float angle, angleType angleType=defAngleType, bool runAsTask=defTurnRunAsTask, int initialPower=defTurnInts[0], int maxPower=defTurnInts[1], int finalPower=defTurnInts[2], int waitAtEnd=defTurnInts[3], int brakePower=defTurnInts[4]) {
+void turn(float angle, angleType angleType=defAngleType, bool runAsTask=defTurnRunAsTask, int initialPower=defTurnInts[0], int maxPower=defTurnInts[1], int finalPower=defTurnInts[2], int waitAtEnd=defTurnInts[3], int brakePower=defTurnInts[4]) {
 	angle = convertAngle(angle, DEGREES, angleType);
 	float a = (pow(angle, 2) * (finalPower+initialPower-2*maxPower) - 2*sqrt(pow(angle, 4) * (finalPower-maxPower) * (initialPower-maxPower))) / pow(angle, 4);
 	float b = ((finalPower-initialPower)/angle - a*angle) * sgn(angle);
 
-	_turn_(drive, angle, a, b, initialPower, runAsTask, waitAtEnd, brakePower);
+	_turn_(angle, a, b, initialPower, runAsTask, waitAtEnd, brakePower);
 }
 
 void setTurnDefaults(angleType angleType, bool runAsTask=defTurnRunAsTask, int initialPower=defTurnInts[0], int maxPower=defTurnInts[1], int finalPower=defTurnInts[2], int waitAtEnd=defTurnInts[3], int brakePower=defTurnInts[4]) {
@@ -158,7 +159,7 @@ typedef struct {
 driveStruct driveData;
 
 bool drivingComplete() {
-	return abs(driveData.totalDist)>driveData.distance  || time(driveData.timer)>driveData.timeout;
+	return abs(driveData.totalDist)>driveData.distance  || time(driveData.timer)>driveData.timeout;//debug
 }
 
 void driveStraightRuntime() {
@@ -181,7 +182,7 @@ void driveStraightRuntime() {
 
 	driveData.totalDist += (leftDist + rightDist) / 2;
 	if (encoderVal(autoDrive) > driveData.minSpeed) driveData.timer = resetTimer(); //track timeout state
-	resetEncoders(autoDrive);
+	resetEncoders/*updatePosition*/(autoDrive);
 }
 
 void driveStraightEnd() {
@@ -214,9 +215,8 @@ void setCorrectionType(correctionType type) {
 	}
 }
 
-void _driveStraight_(parallel_drive &drive, float distance, float a, float b, float c, bool runAsTask=false, float kP=0.25, float kI=0.25, float kD=0.25, correctionType correctionType=AUTO, bool rawValue=false, float minSpeed=3, int timeout=800, int waitAtEnd=250, int sampleTime=50) {
+void _driveStraight_(float distance, float a, float b, float c, bool runAsTask=false, float kP=0.25, float kI=0.25, float kD=0.25, correctionType correctionType=AUTO, bool rawValue=false, float minSpeed=3, int timeout=800, int waitAtEnd=250, int sampleTime=50) {
 	//initialize variables
-	autoDrive = drive;
 	driveData.distance = abs(distance);
 	driveData.a = a;
 	driveData.b = b;
@@ -249,7 +249,7 @@ void _driveStraight_(parallel_drive &drive, float distance, float a, float b, fl
 	}
 
 	//initialize sensors
-	resetEncoders(autoDrive);
+	resetEncoders/*updatePosition*/(autoDrive);
 	resetGyro(autoDrive);
 
 	driveData.timer = resetTimer();
@@ -265,11 +265,11 @@ void _driveStraight_(parallel_drive &drive, float distance, float a, float b, fl
 	}
 }
 
-void driveStraight(parallel_drive &drive, float distance, bool runAsTask=defDriveBools[0], int initialPower=defDriveInts[0], int maxPower=defDriveInts[1], int finalPower=defDriveInts[2], float kP=defDriveFloats[0], float kI=defDriveFloats[1], float kD=defDriveFloats[2], correctionType correctionType=defCorrectionType, bool rawValue=defDriveBools[1], float minSpeed=defDriveFloats[3], int timeout=defDriveInts[3], int waitAtEnd=defDriveInts[4], int sampleTime=defDriveInts[5]) {
+void driveStraight(float distance, bool runAsTask=defDriveBools[0], int initialPower=defDriveInts[0], int maxPower=defDriveInts[1], int finalPower=defDriveInts[2], float kP=defDriveFloats[0], float kI=defDriveFloats[1], float kD=defDriveFloats[2], correctionType correctionType=defCorrectionType, bool rawValue=defDriveBools[1], float minSpeed=defDriveFloats[3], int timeout=defDriveInts[3], int waitAtEnd=defDriveInts[4], int sampleTime=defDriveInts[5]) {
 	float a = (pow(distance, 2) * (finalPower+initialPower-2*maxPower) - 2*sqrt(pow(distance, 4) * (finalPower-maxPower) * (initialPower-maxPower))) / pow(distance, 4);
 	float b = ((finalPower-initialPower)/distance - a*distance) * sgn(distance);
 
-	_driveStraight_(drive, distance, a, b, initialPower, runAsTask, kP, kI, kD, correctionType, rawValue, minSpeed, timeout, waitAtEnd, sampleTime);
+	_driveStraight_(distance, a, b, initialPower, runAsTask, kP, kI, kD, correctionType, rawValue, minSpeed, timeout, waitAtEnd, sampleTime);
 }
 
 void setDriveDefaults(bool runAsTask, int initialPower=defDriveInts[0], int maxPower=defDriveInts[1], int finalPower=defDriveInts[2], float kP=defDriveFloats[0], float kI=defDriveFloats[1], float kD=defDriveFloats[2], correctionType correctionType=defCorrectionType, bool rawValue=defDriveBools[1], float minSpeed=defDriveFloats[3], int timeout=defDriveInts[3], int waitAtEnd=defDriveInts[4], int sampleTime=defDriveInts[5]) {

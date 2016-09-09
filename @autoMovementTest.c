@@ -13,13 +13,12 @@
 #include "pd_autoMove.c"
 #include "motorGroup.c"
 
-parallel_drive drive;
 motorGroup feed;
 
 void autonomous() {
-	driveStraight(drive, 24);
-	turn(drive, -90);
-	driveStraight(drive, 48);
+	driveStraight(24);
+	turn(-90);
+	driveStraight(48);
 }
 
 task main() {
