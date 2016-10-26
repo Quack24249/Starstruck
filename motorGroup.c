@@ -127,11 +127,14 @@ void createTarget(motorGroup *group, int position, TVexJoysticks btn) {
 	}
 }
 //end motor targets region
-
 void setPower(motorGroup *group, int power) {
 	for (int i=0; i<group->numMotors; i++) {
 		motor[group->motors[i]] = power;
 	}
+}
+
+void moveTowardPos(motorGroup *group, int position, int power=127) {
+	setPower(motorGroup, (potentiometerVal(motorGroup)<position ? power : -power));
 }
 
 void getTargetInput(motorGroup *group) {
