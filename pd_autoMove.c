@@ -76,7 +76,7 @@ task turnTask() {
 	turnEnd();
 }
 
-void turn(float angle, bool runAsTask=defTurnBools[0], float in1=defTurnFloats[0], float in2=defTurnFloats[1], float in3=defTurnFloats[2], angleType angleType=defAngleType, bool useGyro=defTurnBools[1], int brakePower=defTurnInts[0], int waitAtEnd=defTurnInts[1], int brakeDuration=defTurnInts[2]) { //for PD, in1=0, in2=kP, in3=kD; for quad ramping, in1=initial, in2=maximum, and in3=final
+void turn(float angle, float in1=defTurnFloats[0], float in2=defTurnFloats[1], float in3=defTurnFloats[2], bool runAsTask=defTurnBools[0], angleType angleType=defAngleType, bool useGyro=defTurnBools[1], int brakePower=defTurnInts[0], int waitAtEnd=defTurnInts[1], int brakeDuration=defTurnInts[2]) { //for PD, in1=0, in2=kP, in3=kD; for quad ramping, in1=initial, in2=maximum, and in3=final
 	//initialize variables
 	float formattedAngle = convertAngle(abs(angle), DEGREES, angleType);
 	turnData.angle = (useGyro ? formattedAngle : 2*PI*autoDrive.width*formattedAngle/360.);
@@ -128,8 +128,8 @@ bool drivingComplete() {
 }
 
 void driveStraightRuntime() {
-	driveData.leftDist += abs(driveEncoderVal(autoDrive, LEFT, driveData.rawValue));
-	driveData.rightDist += abs(driveEncoderVal(autoDrive, RIGHT, driveData.rawValue));
+	driveData.leftDist += driveEncoderVal(autoDrive, LEFT, driveData.rawValue);
+	driveData.rightDist += driveEncoderVal(autoDrive, RIGHT, driveData.rawValue);
 	driveData.totalDist = (driveData.leftDist + driveData.rightDist) / 2;
 
 	if (driveEncoderVal(autoDrive) > driveData.minSpeed) driveData.timer = resetTimer(); //track timeout state
@@ -149,18 +149,11 @@ void driveStraightRuntime() {
 			error = 0;
 	}
 
+	float slaveCoeff = 1 + PID_runtime(driveData.pid, error);
+
 	int power = rampRuntime(driveData.ramper, driveData.totalDist);
 
-	float correctionPercent = 1 + PID_runtime(driveData.pid, error);
-	float rightPower = power * correctionPercent;
-	float leftPower = power;
-
-	if (rightPower > 127) {
-		rightPower = 127;
-		leftPower = 127 / (correctionPercent);
-	}
-
-	setDrivePower(autoDrive, driveData.direction*leftPower, driveData.direction*rightPower);
+	setDrivePower(autoDrive, slaveCoeff*driveData.direction*power, driveData.direction*power);
 }
 
 void driveStraightEnd() {
