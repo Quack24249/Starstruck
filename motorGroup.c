@@ -13,6 +13,9 @@ typedef struct {
 	TVexJoysticks posInput, negInput; //inputs. NegInput only assigned if using button control
 	//button control
 	int upPower, downPower, stillSpeed;
+	//execute maneuver
+	int targetPos, endPower, maneuverPower;
+	bool forward, maneuverExecuting; //forward: whether target is forwad from initial group position
 	//joystick control
 	int deadband; //range of motor values around 0 for which motors are not engaged
 	bool isRamped; //whether group is ramped
@@ -133,10 +136,40 @@ void setPower(motorGroup *group, int power) {
 	}
 }
 
+<<<<<<< HEAD
 void moveTowardPos(motorGroup *group, int position, int power=127) {
 	setPower(motorGroup, (potentiometerVal(motorGroup)<position ? power : -power));
 }
 
+=======
+void executeManeuver(motorGroup *group) {
+	if (group->maneuverExecuting) {
+		if (group->forward == (potentiometerVal(group) > group->targetPos)) { //whether maneuver is finished
+			setPower(group, group->endPower);
+			group->maneuverExecuting = false;
+		} else {
+			setPower(group, (group->forward ? group->maneuverPower : -group->maneuverPower));
+		}
+	}
+}
+
+void createManeuver(motorGroup *group, int position, int endPower=0, int maneuverPower=127) {
+	group->targetPos = position;
+	group->endPower = endPower;
+	group->maneuverPower = maneuverPower;
+	group->forward = group->targetPos > potentiometerVal(group);
+	group->maneuverExecuting = true;
+}
+
+void goToPosition(motorGroup *group, int position, int endPower=0, int maneuverPower=127) {
+	short displacementSign = sgn(position - potentiometerVal(group));
+	setPower(group, displacementSign*maneuverPower);
+	while (sgn(position - potentiometerVal(group)) == displacementSign) {}
+	setPower(group, endPower);
+}
+
+//user input region
+>>>>>>> refs/remotes/origin/master
 void getTargetInput(motorGroup *group) {
 	for (int i=0; i<numTargets; i++) {
 		if (group->targets[i] == -1) {
@@ -238,3 +271,4 @@ int takeInput(motorGroup *group, bool setMotors=true) {
 
 	return power;
 }
+//end user input region
