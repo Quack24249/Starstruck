@@ -48,13 +48,18 @@
 #define clawClosedPos 750
 #define clawMax 1620
 
+//potentiometer-val/angle regressions
+#define potentiometerRegSlope 0.0651
+#define shoulderRegInt 20.
+#define clawRegInt = 
+
 //constants -- lift
 #define fourBarDeadband 50 //allowable deviation from totalTargetPos
 #define shoulderFourBarPower 90
 #define shoulderStillSpeed 10 //still speeds
 #define wristStillSpeed 10
 #define clawStillSpeed 15
-#define shoulderRegSlope 0.0651 //potentiometer regression constants
+#define shoulderRegSlope 0.0651 //potentiometer-val/angle regression constants
 #define shoulderRegInt 20.
 #define logistic_k 0.0005 //wrist pos-matching logistic constants
 #define logisticM 127
@@ -107,6 +112,10 @@ void pre_auton() {
 }
 
 //lift region
+float shoulderAngle() {
+	return shoulderRegSlope*potentiometerVal(shoulder) + shoulderRegInt;
+}
+
 int totalLiftPotVal() {
 	return potentiometerVal(wrist) + potentiometerVal(shoulder);
 }
@@ -145,6 +154,23 @@ void liftControl() {
 		setPower(wrist, wristStillSpeed);
 	}
 }
+	//autonomous subregion
+void goToShoulderAngle(float angle) {
+
+}
+
+void createShoulderAngleManeuver(float angle) {
+
+}
+
+void goToWristAngle(float angle) {
+
+}
+
+void createWristAngleManeuver(float angle) {
+
+}
+	//end autonomous subregion
 //end lift region
 
 
