@@ -40,10 +40,10 @@
 #define wristDownBtn Btn8D
 
 //positions
-#define shoulderBottom 930 //shoulder
-#define shoulderTop 2050
-#define shoulderMiddle 735
-#define shoulderVert 3215
+#define shoulderBottom -60. //shoulder
+#define shoulderTop 135.
+#define shoulderMiddle -45.
+#define shoulderVert 90.
 #define clawOpenPos 1130 //claw
 #define clawClosedPos 750
 #define clawMax 1620
@@ -54,6 +54,8 @@
 #define shoulderStillSpeed 10 //still speeds
 #define wristStillSpeed 10
 #define clawStillSpeed 15
+#define shoulderRegSlope 0.0651 //potentiometer regression constants
+#define shoulderRegInt 20.
 #define logistic_k 0.0005 //wrist pos-matching logistic constants
 #define logisticM 127
 #define logistic_i 10
@@ -104,19 +106,62 @@ void pre_auton() {
 	initializeLogisticRamp(wristRamp, logistic_k, 2*logisticM, logistic_i); //used for position matching between lift components
 }
 
-//autonomous region
-void stopManeuvers() {
-	claw.maneuverExecuting = false;
-	shoulder.maneuverExecuting = false;
-	wrist.maneuverExecuting = false;
+//lift region
+int totalLiftPotVal() {
+	return potentiometerVal(wrist) + potentiometerVal(shoulder);
 }
 
-void deploy(int waitAtEnd=250) {
-	//deploy stops
-	goToPosition(shoulder, 1200);
-	goToPosition(shoulder, shoulderBottom);
+void toggleLiftMode() {
+	fourBar = !fourBar;
+
+	if (fourBar) {
+		totalTargetPos = totalLiftPotVal();
+		shoulder.upPower = shoulderFourBarPower;
+		shoulder.downPower = shoulderFourBarPower;
+	} else {
+		shoulder.upPower = 127;
+		shoulder.downPower = 127;
+	}
 }
 
+void liftControl() {
+	if (newlyPressed(toggleLiftModeBtn))
+		toggleLiftMode();
+
+	short shoulderPos = potentiometerVal(shoulder);
+
+	shoulder.stillSpeed = shoulderStillSpeed * ((shoulderPos<shoulderMiddle || shoulderPos>shoulderVert) ? 1 : -1);
+	short shoulderPower = takeInput(shoulder);
+	short wristPower = takeInput(wrist, false);
+
+	int totalPos = totalLiftPotVal();
+
+	if (wristPower != 0) {
+		setPower(wrist, wristPower);
+		totalTargetPos = totalPos;
+	}	else if (fourBar && (abs(totalTargetPos - totalPos) > fourBarDeadband)) {
+		setPower(wrist, logisticRampRuntime(wristRamp, totalTargetPos - totalPos + logistic_s)); //moves wrist toward shoulder position
+	} else {
+		setPower(wrist, wristStillSpeed);
+	}
+}
+//end lift region
+
+
+//claw region
+void clawControl() {
+	if (vexRT[closeClawBtn] == 1) {
+		setPower(claw, 127);
+		clawOpen = false;
+	} else if (vexRT[openClawBtn] == 1) {
+		setPower(claw, -127);
+		clawOpen = true;
+	} else {
+		setPower(claw, clawStillSpeed * (clawOpen ? -1 : 1));
+	}
+}
+
+ //autonomous subregion
 void setClawStateManeuver(bool open = !clawOpen) { //toggles by default
 	if (open) {
 		createManeuver(claw, clawOpenPos, clawStillSpeed);
@@ -137,6 +182,22 @@ void closeClaw(bool stillSpeed=true) {
 
 void hyperExtendClaw(bool stillSpeed=true) {
 	goToPosition(claw, clawMax, (stillSpeed ? clawStillSpeed : 0));
+}
+ //end autonomous subregion
+//end claw region
+
+
+//autonomous region
+void stopManeuvers() {
+	claw.maneuverExecuting = false;
+	shoulder.maneuverExecuting = false;
+	wrist.maneuverExecuting = false;
+}
+
+void deploy(int waitAtEnd=250) {
+	//deploy stops
+	goToPosition(shoulder, 1200);
+	goToPosition(shoulder, shoulderBottom);
 }
 
 	//pillowAuton subregion
@@ -252,57 +313,6 @@ task autonomous() {
 //end autonomous region
 
 //user control region
-int totalLiftPotVal() {
-	return potentiometerVal(wrist) + potentiometerVal(shoulder);
-}
-
-void toggleLiftMode() {
-	fourBar = !fourBar;
-
-	if (fourBar) {
-		totalTargetPos = totalLiftPotVal();
-		shoulder.upPower = shoulderFourBarPower;
-		shoulder.downPower = shoulderFourBarPower;
-	} else {
-		shoulder.upPower = 127;
-		shoulder.downPower = 127;
-	}
-}
-
-void liftControl() {
-	if (newlyPressed(toggleLiftModeBtn))
-		toggleLiftMode();
-
-	short shoulderPos = potentiometerVal(shoulder);
-
-	shoulder.stillSpeed = shoulderStillSpeed * ((shoulderPos<shoulderMiddle || shoulderPos>shoulderVert) ? 1 : -1);
-	short shoulderPower = takeInput(shoulder);
-	short wristPower = takeInput(wrist, false);
-
-	int totalPos = totalLiftPotVal();
-
-	if (wristPower != 0) {
-		setPower(wrist, wristPower);
-		totalTargetPos = totalPos;
-	}	else if (fourBar && (abs(totalTargetPos - totalPos) > fourBarDeadband)) {
-		setPower(wrist, logisticRampRuntime(wristRamp, totalTargetPos - totalPos + logistic_s)); //moves wrist toward shoulder position
-	} else {
-		setPower(wrist, wristStillSpeed);
-	}
-}
-
-void clawControl() {
-	if (vexRT[closeClawBtn] == 1) {
-		setPower(claw, 127);
-		clawOpen = false;
-	} else if (vexRT[openClawBtn] == 1) {
-		setPower(claw, -127);
-		clawOpen = true;
-	} else {
-		setPower(claw, clawStillSpeed * (clawOpen ? -1 : 1));
-	}
-}
-
 task usercontrol() {
 	while (true) {
   	driveRuntime(drive);
